@@ -1,0 +1,100 @@
+buildscript {
+    ext {
+        kotlinVersion = '1.3.21'
+        kodeinVersion = '6.1.0'
+        spekVersion = '2.0.0'
+        expektVersion = '0.5.0'
+        mockitoVersion = '2.8.47'
+        guavaVersion = '25.0-jre'
+        retrofitVersion = '2.5.0'
+        mockWebServerVersion = '3.11.0'
+        junitVersion = '5.4.0'
+    }
+
+    repositories {
+        mavenCentral()
+        jcenter()
+        maven { url 'http://central.maven.org/maven2/' }
+        maven { url 'https://plugins.gradle.org/m2/' }
+    }
+
+    dependencies {
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
+        classpath('org.hibernate.build.gradle:gradle-maven-publish-auth:2.0.1')
+    }
+}
+
+apply plugin: 'kotlin'
+apply plugin: 'maven-publish'
+
+sourceSets {
+    main.kotlin.srcDirs += 'src/main/kotlin'
+    test.kotlin.srcDirs += 'src/test/kotlin'
+    main.resources.srcDirs += 'src/main/resource'
+    test.resources.srcDirs += 'src/test/resource'
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+group = 'com.omnitrade'
+version = '0.1.0'
+
+repositories {
+    maven { url 'http://jcenter.bintray.com' }
+    maven { url 'http://repo.maven.apache.org/maven2' }
+}
+
+dependencies {
+    compile("org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion")
+    compile("org.kodein.di:kodein-di-generic-jvm:$kodeinVersion")
+    compile("com.squareup.retrofit2:retrofit:$retrofitVersion")
+    compile("com.squareup.retrofit2:converter-gson:$retrofitVersion")
+    compile("com.google.guava:guava:$guavaVersion")
+
+    testCompile("org.jetbrains.kotlin:kotlin-test-junit:$kotlinVersion")
+    testCompile("com.winterbe:expekt:$expektVersion")
+    testCompile("org.mockito:mockito-core:$mockitoVersion")
+    testCompile("com.squareup.okhttp3:mockwebserver:$mockWebServerVersion")
+    testCompile("org.junit.jupiter:junit-jupiter-api:$junitVersion")
+    testCompile("org.spekframework.spek2:spek-dsl-jvm:$spekVersion") {
+        exclude group: 'org.jetbrains.kotlin'
+    }
+
+    testRuntime("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
+
+    testRuntimeOnly("org.spekframework.spek2:spek-runner-junit5:$spekVersion") {
+        exclude group: 'org.junit.platform'
+        exclude group: 'org.jetbrains.kotlin'
+    }
+    testRuntimeOnly("org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion")
+}
+
+test {
+    useJUnitPlatform {
+        includeEngines 'spek2'
+    }
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            pom.withXml {
+                asNode().dependencies.'*'.findAll() {
+                    it.scope.text() == 'runtime' && project.configurations.compile.allDependencies.find { dep ->
+                        dep.name == it.artifactId.text()
+                    }
+                }.each() {
+                    it.scope*.value = 'compile'
+                }
+            }
+        }
+    }
+}
+
+model {
+    tasks.generatePomFileForMavenPublication {
+        destination = file("$buildDir/libs/${rootProject.name}-${version}.pom")
+    }
+}
